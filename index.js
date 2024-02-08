@@ -12,7 +12,7 @@ app.use(express.json());
 app.use(cors());
 
 // Database Connection with MongoDB
-mongoose.connect('mongodb+srv://raviegupta:LCCSeTCVaEuDn293@cluster0.cfuoowm.mongodb.net/e-comm')
+mongoose.connect('mongodb+srv://raviegupta153:6b0WRpx8SjTzp14V@cluster0.b4fikqr.mongodb.net/e-comm')
 
 // API creation
 app.get('/', (req, res)=>{
@@ -33,7 +33,7 @@ const storage = multer.diskStorage({
 })
 const upload = multer({storage:storage})
 
-// Creating upload Endpoint for images
+// Creating Upload Endpoint for images
 app.use('/images', express.static('upload/images'))
 
 app.post('/upload', upload.single('product'), (req, res)=>{
@@ -80,7 +80,7 @@ const Products = mongoose.model('Product', {
     },
 })
 
-// Creating API for adding Products
+// Creating API for Adding Products
 app.post('/addproduct', async (req, res)=>{
     let products = await Products.find({});
     let id;
@@ -111,7 +111,7 @@ app.post('/addproduct', async (req, res)=>{
     })
 })
 
-// Creating API for deleting Products
+// Creating API for Deleting Products
 app.post('/removeproduct', async (req, res)=>{
     await Products.findOneAndDelete({id:req.body.id});
     console.log('removed');
@@ -130,8 +130,8 @@ app.get('/allproducts', async (req, res)=>{
 })
 
 
-// ---------------------------------------------------------------------
-// Now, Creating API for user creation, login, Saving Cart items in DB
+// -------------------------------------------------------------------------
+// Now, Creating API for user creation, login, Saving Cart items in DataBase
 // Schema for creating User model
 const Users = mongoose.model('User', {
     name:{
@@ -204,4 +204,74 @@ app.post('/login', async (req, res)=>{
         res.json({success:false, errors:'Email not registered'});
     }
     
+})
+
+// Creating EndPoint for newcollections
+app.get('/newcollections', async (req, res)=>{
+    let products = await Products.find({})
+    let newcollection = products.slice(1).slice(-8);
+    console.log('NEW COLLECTIONS fetched');
+    res.send(newcollection);
+})
+
+// Creating EndPoint for popular in women
+app.get('/popularinwomen', async (req, res)=>{
+    let products = await Products.find({category:'women'})
+    let popular_in_women = products.slice(0, 4);
+    console.log('POPULAR IN WOMEN fetched');
+    res.send(popular_in_women);
+})
+
+// Creating middleware to fetch user
+const fetchUser = async (req, res, next)=>{
+    const token = req.header('auth-token');
+    if(!token){
+        res.status(401).send({errors:'Please, Aunthenticate using valid token'})
+    }else{
+        try{
+            const data = jwt.verify(token, 'secret_ecom');
+            req.user = data.user;
+            next();
+        }catch(error){
+            res.status(401).send({errors:'Please, Aunthenticate using valid token'})
+        }
+    }
+
+}
+
+// Creating EndPoint for adding products in cartdata
+app.post('/addtocart', fetchUser, async (req, res)=>{
+    console.log(req.body, req.user);
+
+    let userData = await Users.findOne({_id:req.user.id});
+    console.log(userData.cartData[req.body.itemId]);
+
+    userData.cartData[req.body.itemId] += 1;
+    await Users.findOneAndUpdate({_id:req.user.id}, {cartData:userData.cartData});
+    console.log(userData.cartData[req.body.itemId]);
+
+    res.send('item added on cart')
+    console.log('item added on cart')
+})
+
+// Creating EndPoint for removing products in cartdata
+app.post('/removefromcart', fetchUser, async (req, res)=>{
+    let userData = await Users.findOne({_id:req.user.id});
+    console.log(userData.cartData[req.body.itemId]);
+
+    if(userData.cartData[req.body.itemId]>0){
+        userData.cartData[req.body.itemId] -= 1;
+        await Users.findOneAndUpdate({_id:req.user.id}, {cartData:userData.cartData});
+        console.log(userData.cartData[req.body.itemId]);
+
+        res.send('item removed from cart')
+        console.log('item removed from cart')
+    }
+})
+
+// Creating EndPoint to get logged-in user cartdata
+app.post('/getcart', fetchUser, async (req, res)=>{
+    console.log('getcart');
+    let userData = await Users.findOne({_id:req.user.id});
+    res.json(userData.cartData);
 })
